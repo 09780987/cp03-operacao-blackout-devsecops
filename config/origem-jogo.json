@@ -1,0 +1,31 @@
+{
+  "game": "Operação Blackout",
+  "origin": "Pasta exgame informada pelo usuário",
+  "mode": "Build de navegador recebido, empacotado sem modificar o JavaScript e o CSS do jogo",
+  "files": [
+    {
+      "source": "exgame/public_html/blackout/favicon.svg",
+      "destination": "src/public/blackout/favicon.svg",
+      "sha256": "61bc9a161de58248288e6905425d7180f0624c2865007b97d763fdac12043a66",
+      "bytes": 9522
+    },
+    {
+      "source": "exgame/public_html/blackout/icons.svg",
+      "destination": "src/public/blackout/icons.svg",
+      "sha256": "b45fa506195cfcdef406ba9f0c77b36ddc1a7c224040926ec70abc2fdea7b93a",
+      "bytes": 5031
+    },
+    {
+      "source": "exgame/public_html/blackout/assets/index-2Gsa3GjI.css",
+      "destination": "src/public/blackout/assets/index-2Gsa3GjI.css",
+      "sha256": "51ad8670a46b7c1e44712289ac2c1168c2b50c5b7d01b5bc72934ffafb2b40db",
+      "bytes": 48046
+    },
+    {
+      "source": "exgame/public_html/blackout/assets/index-D5b49BWm.js",
+      "destination": "src/public/blackout/assets/index-D5b49BWm.js",
+      "sha256": "21d74551c036d1bde478ab16130e1b147b0bf8969d5001fc165e953aa3ccde27",
+      "bytes": 1243996
+    }
+  ]
+}
