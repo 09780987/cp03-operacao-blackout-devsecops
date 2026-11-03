@@ -1,0 +1,18 @@
+{
+  "url": "https://operacao-blackout-rm565098-rm565963.onrender.com",
+  "http_status": 200,
+  "health": {
+    "status": "ok",
+    "application": "operacao-blackout",
+    "version": "5fc7e6f6abb3485e1f7d56398380b133640866df"
+  },
+  "health_local": {
+    "status": "ok",
+    "application": "operacao-blackout",
+    "version": "5fc7e6f6abb3485e1f7d56398380b133640866df"
+  },
+  "digest": "sha256:f038e8bd6c53cab7bf1e5c3a301ed719af201778bf4f5b719a5fd734a53c2a55",
+  "download_anonimo": true,
+  "usuario_runtime": "node",
+  "plataforma": "linux/amd64"
+}

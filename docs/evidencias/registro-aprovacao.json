@@ -1,0 +1,37 @@
+{
+  "user": {
+    "login": "09780987",
+    "id": 182431881,
+    "node_id": "U_kgDOCt-wiQ",
+    "avatar_url": "https://avatars.githubusercontent.com/u/182431881?v=4",
+    "gravatar_id": "",
+    "url": "https://api.github.com/users/09780987",
+    "html_url": "https://github.com/09780987",
+    "followers_url": "https://api.github.com/users/09780987/followers",
+    "following_url": "https://api.github.com/users/09780987/following{/other_user}",
+    "gists_url": "https://api.github.com/users/09780987/gists{/gist_id}",
+    "starred_url": "https://api.github.com/users/09780987/starred{/owner}{/repo}",
+    "subscriptions_url": "https://api.github.com/users/09780987/subscriptions",
+    "organizations_url": "https://api.github.com/users/09780987/orgs",
+    "repos_url": "https://api.github.com/users/09780987/repos",
+    "events_url": "https://api.github.com/users/09780987/events{/privacy}",
+    "received_events_url": "https://api.github.com/users/09780987/received_events",
+    "type": "User",
+    "user_view_type": "public",
+    "site_admin": false
+  },
+  "state": "approved",
+  "comment": "Aprovado após conferência dos relatórios: 10 testes passaram, sem achados bloqueantes, HIGH/CRITICAL corrigíveis ou alertas High/Medium no ZAP. Mantidos no registro os três timeouts do SAST, o inventário parcial do bundle e o fingerprint restrito à amostra fictícia. Publicação no Render Free pelo digest analisado.",
+  "environments": [
+    {
+      "id": 26082306593,
+      "node_id": "EN_kwDOVgxh0s8AAAAGEqBqIQ",
+      "name": "producao",
+      "url": "https://api.github.com/repos/09780987/cp03-operacao-blackout-devsecops/environments/producao",
+      "html_url": "https://github.com/09780987/cp03-operacao-blackout-devsecops/deployments/activity_log?environments_filter=producao",
+      "created_at": "2026-11-03T01:05:53Z",
+      "updated_at": "2026-11-03T01:06:53Z",
+      "can_admins_bypass": false
+    }
+  ]
+}
