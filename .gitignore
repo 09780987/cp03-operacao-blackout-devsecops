@@ -1,0 +1,12 @@
+node_modules/
+dist/
+reports/
+work/
+tools/
+output/
+.env
+.env.*
+*.log
+.cache/
+__pycache__/
+.sast-input/

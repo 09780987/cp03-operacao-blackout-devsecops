@@ -1,0 +1,19 @@
+{
+  "name": "operacao-blackout-devsecops",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Operação Blackout do Challenge 2026 com esteira DevSecOps",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node --test --test-reporter=spec",
+    "test:coverage": "node --experimental-test-coverage --test"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
+}
