@@ -1,0 +1,327 @@
+name: Esteira DevSecOps
+
+on:
+  push:
+    paths-ignore:
+      - docs/**
+      - README.md
+      - THIRD_PARTY_NOTICES.md
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devsecops-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  secrets-scan:
+    name: 1. Secrets com Gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: mkdir -p reports/01-gitleaks; printf 'Etapa 1 iniciada. Consulte execucao.log e gitleaks.json.\n' > reports/01-gitleaks/status.txt
+      - run: bash scripts/security.sh secrets
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: relatorio-01-gitleaks
+          path: reports/01-gitleaks/
+          retention-days: 90
+
+  sast:
+    name: 2. SAST com Semgrep
+    needs: secrets-scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: mkdir -p reports/02-semgrep; printf 'Etapa 2 iniciada. Consulte execucao.log e semgrep.json.\n' > reports/02-semgrep/status.txt
+      - run: bash scripts/security.sh sast
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: relatorio-02-semgrep
+          path: reports/02-semgrep/
+          retention-days: 90
+
+  build:
+    name: 3. Build, testes e dependências
+    needs: sast
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: mkdir -p reports/03-build; printf 'Etapa 3 iniciada. Consulte os relatórios de build, testes e auditoria.\n' > reports/03-build/status.txt
+      - run: bash scripts/build-report.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: relatorio-03-build
+          path: reports/03-build/
+          retention-days: 90
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: success()
+        with:
+          name: artefato-aplicacao-${{ github.sha }}
+          path: |
+            reports/03-build/blackout-${{ github.sha }}.tar.gz
+            reports/03-build/blackout-${{ github.sha }}.tar.gz.sha256
+          retention-days: 90
+
+  sca:
+    name: 4. SCA com Trivy fs
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: mkdir -p reports/04-trivy-sca; printf 'Etapa 4 iniciada. Consulte os relatórios completo e filtrado.\n' > reports/04-trivy-sca/status.txt
+      - run: bash scripts/security.sh sca
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: relatorio-04-trivy-sca
+          path: reports/04-trivy-sca/
+          retention-days: 90
+
+  docker-build:
+    name: 5. Docker Build e GHCR
+    needs: sca
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.metadata.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: mkdir -p reports/05-docker-build; printf 'Build/push ainda não concluído. Consulte o resultado do job.\n' > reports/05-docker-build/docker-build.md
+      - id: metadata
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: printf 'image=ghcr.io/%s\n' "${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.metadata.outputs.image }}:${{ github.sha }}
+          platforms: linux/amd64
+          build-args: APP_VERSION=${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - env:
+          IMAGE: ${{ steps.metadata.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE@$DIGEST" > reports/05-docker-build/manifesto.txt
+          docker buildx imagetools inspect --raw "$IMAGE@$DIGEST" > reports/05-docker-build/manifesto.json
+          printf '# Docker Build e GHCR\n\nImagem: `%s:%s`\n\nDigest: `%s`\n\nExecução: %s/%s/actions/runs/%s\n' "$IMAGE" "$GITHUB_SHA" "$DIGEST" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > reports/05-docker-build/docker-build.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: relatorio-05-docker-build
+          path: reports/05-docker-build/
+          retention-days: 90
+
+  image-scan:
+    name: 6. Scan da imagem com Trivy
+    needs: docker-build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: mkdir -p reports/06-trivy-image; printf 'Etapa 6 iniciada. Consulte os relatórios da imagem.\n' > reports/06-trivy-image/status.txt
+      - env:
+          IMAGE_REF: ${{ needs.docker-build.outputs.image }}@${{ needs.docker-build.outputs.digest }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/security.sh image
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: relatorio-06-trivy-image
+          path: reports/06-trivy-image/
+          retention-days: 90
+
+  dast-staging:
+    name: 7. Homologação e OWASP ZAP
+    needs: [image-scan, docker-build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: homologacao
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: mkdir -p reports/07-homologacao-zap; printf 'Etapa 7 iniciada. Consulte os relatórios do ZAP.\n' > reports/07-homologacao-zap/status.txt
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - env:
+          IMAGE_REF: ${{ needs.docker-build.outputs.image }}@${{ needs.docker-build.outputs.digest }}
+        run: |
+          docker run -d --name blackout-homologacao --read-only --cap-drop ALL --security-opt no-new-privileges:true -p 127.0.0.1:3000:3000 "$IMAGE_REF"
+          curl --fail --silent --show-error --retry 15 --retry-delay 2 --retry-all-errors http://127.0.0.1:3000/health > reports/07-homologacao-zap/health.json
+          jq --arg sha "$GITHUB_SHA" -e '.status == "ok" and .version == $sha' reports/07-homologacao-zap/health.json > /dev/null
+      - name: ZAP Baseline informativo
+        env:
+          ZAP_TARGET: http://127.0.0.1:3000
+        run: bash scripts/security.sh zap
+      - if: always()
+        run: docker logs blackout-homologacao > reports/07-homologacao-zap/container.log 2>&1; docker rm -f blackout-homologacao || true
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: relatorio-07-homologacao-zap
+          path: reports/07-homologacao-zap/
+          retention-days: 90
+
+  resumo-pre-aprovacao:
+    name: Resumo para revisão
+    needs: [secrets-scan, sast, build, sca, docker-build, image-scan, dast-staging]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: relatorio-*
+          path: reports/
+      - if: always()
+        env:
+          SECRETS_RESULT: ${{ needs.secrets-scan.result }}
+          SAST_RESULT: ${{ needs.sast.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          SCA_RESULT: ${{ needs.sca.result }}
+          DOCKER_RESULT: ${{ needs.docker-build.result }}
+          IMAGE_RESULT: ${{ needs.image-scan.result }}
+          DAST_RESULT: ${{ needs.dast-staging.result }}
+          PROD_RESULT: aguardando revisão ou não aplicável
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash scripts/summary.sh reports reports/resumo-pre-aprovacao.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: resumo-parcial-pre-aprovacao
+          path: reports/resumo-pre-aprovacao.md
+          retention-days: 90
+
+  deploy-prod:
+    name: 8. Aprovação e produção
+    needs: [dast-staging, docker-build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    environment:
+      name: producao
+      url: ${{ steps.deploy.outputs.url }}
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: mkdir -p reports/08-producao; printf 'Deploy ainda não concluído. Consulte o resultado do job.\n' > reports/08-producao/deploy-producao.md
+      - name: Verificar registro da aprovação
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/approval.mjs
+      - id: deploy
+        env:
+          IMAGE_REF: ${{ needs.docker-build.outputs.image }}@${{ needs.docker-build.outputs.digest }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_OWNER_ID: ${{ vars.RENDER_OWNER_ID }}
+          RENDER_SERVICE_NAME: ${{ vars.RENDER_SERVICE_NAME }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/deploy-render.mjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: relatorio-08-producao
+          path: reports/08-producao/
+          retention-days: 90
+
+  pipeline-summary:
+    name: Resumo da Esteira
+    needs: [secrets-scan, sast, build, sca, docker-build, image-scan, dast-staging, deploy-prod]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: relatorio-*
+          path: reports/
+      - name: Consolidar resultados com jq
+        if: always()
+        env:
+          SECRETS_RESULT: ${{ needs.secrets-scan.result }}
+          SAST_RESULT: ${{ needs.sast.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          SCA_RESULT: ${{ needs.sca.result }}
+          DOCKER_RESULT: ${{ needs.docker-build.result }}
+          IMAGE_RESULT: ${{ needs.image-scan.result }}
+          DAST_RESULT: ${{ needs.dast-staging.result }}
+          PROD_RESULT: ${{ needs.deploy-prod.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash scripts/summary.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: resumo-da-esteira
+          path: reports/resumo-esteira.md
+          retention-days: 90
