@@ -1,0 +1,25 @@
+import { execFileSync } from 'node:child_process';
+import { readFile, writeFile } from 'node:fs/promises';
+
+const run = process.argv[2];
+if (!run || !/^\d+$/.test(run)) throw new Error('Uso: node scripts/registrar-execucao.mjs ID_DA_EXECUCAO');
+const gh = args => execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 });
+const repository = JSON.parse(gh(['repo', 'view', '--json', 'nameWithOwner'])).nameWithOwner;
+const result = JSON.parse(gh(['api', `repos/${repository}/actions/runs/${run}`]));
+if (result.conclusion !== 'success') throw new Error('A execução informada ainda não terminou com sucesso.');
+const jobs = JSON.parse(gh(['api', `repos/${repository}/actions/runs/${run}/jobs?per_page=100`]));
+if (jobs.jobs.filter(job => job.conclusion === 'success').length < 9) throw new Error('A execução não tem as oito etapas e o resumo concluídos com sucesso.');
+const approvals = JSON.parse(gh(['api', `repos/${repository}/actions/runs/${run}/approvals`]));
+const approval = approvals.find(item => item.state === 'approved' && item.environments.some(environment => environment.name === 'producao'));
+if (!approval) throw new Error('A execução não contém aprovação de produção.');
+gh(['run', 'download', run, '--repo', repository, '--dir', 'docs/evidencias/github']);
+const deployment = await readFile('docs/evidencias/github/relatorio-08-producao/deploy-producao.md', 'utf8');
+const artifacts = JSON.parse(gh(['api', `repos/${repository}/actions/runs/${run}/artifacts?per_page=100`]));
+const reports = artifacts.artifacts.filter(artifact => artifact.name.startsWith('relatorio-'));
+if (reports.length !== 8) throw new Error('Devem existir oito relatórios da execução.');
+const links = reports.sort((a, b) => a.name.localeCompare(b.name)).map(artifact => `- [${artifact.name}](https://github.com/${repository}/actions/runs/${run}/artifacts/${artifact.id})`).join('\n');
+const content = `# Execução no GitHub\n\n![Esteira DevSecOps](https://github.com/${repository}/actions/workflows/devsecops.yml/badge.svg)\n\nRepositório público: https://github.com/${repository}\n\nExecução completa: ${result.html_url}\n\nCommit: ${result.head_sha}\n\nPessoa revisora: ${approval.user.login}\n\nA pessoa revisora aprovou o environment producao após a disponibilização dos relatórios das etapas 1 a 7. O comentário registrado no GitHub foi: ${approval.comment || 'sem comentário adicional'}.\n\n${deployment}\n\n## Relatórios da execução\n\n${links}\n`;
+await writeFile('docs/execucao-github.md', content);
+const readme = await readFile('README.md', 'utf8');
+if (!readme.includes('## Execução publicada')) await writeFile('README.md', `${readme}\n## Execução publicada\n\n${content.replace(/^# Execução no GitHub\n\n/, '')}`);
+console.log('Registro preenchido com dados da execução real. Capture também as telas do GitHub e da produção.');
