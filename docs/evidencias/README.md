@@ -10,6 +10,6 @@ As pastas relatorios e antes permitem comparar os resultados. A instância ZAP d
 
 Prints reais: esteira-completa.jpg, resumo-esteira.jpg, gate-bloqueado.jpg, gate-corrigido.jpg, aprovacao.jpg, imagem-ghcr.jpg, jogo-producao.jpg, blackout-inicio.jpg, blackout-cenario.jpg e environment-producao.jpg.
 
-O relatório mantém texto preto sobre fundo branco e inclui todos os dez prints na seção 10, com legendas e indicação de origem. As capturas originais também ficam separadas em prints. A captura mais longa aparece em partes contínuas no PDF para preservar a leitura. Os relatórios de scanners permanecem em seus formatos originais.
+O relatório mantém texto preto sobre fundo branco e inclui todos os dez prints após as referências. Cada página de evidência contém apenas o título e a captura. As imagens originais também ficam separadas em prints. A captura mais longa aparece em partes contínuas no PDF para preservar a leitura. Os relatórios de scanners permanecem em seus formatos originais.
 
 A produção usa https://operacao-blackout-rm565098-rm565963.onrender.com, imagem por digest sha256:f038e8bd6c53cab7bf1e5c3a301ed719af201778bf4f5b719a5fd734a53c2a55. O registro de aprovação é a resposta real da API do GitHub. Os nomes e RMs são identificação acadêmica autorizada; e-mails pessoais e credenciais não integram estas evidências.
