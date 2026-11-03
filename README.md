@@ -110,7 +110,7 @@ O repositório usa somente a conta GitHub 09780987 como contribuidora. A identif
 - [Execução](docs/execucao-github.md): SHA, digest, aprovação e produção.
 - [Evidências](docs/evidencias/README.md): prints e relatórios preservados.
 - [Publicação](docs/publicacao.md): configuração e rollback.
-- [Relatório PDF](docs/Relatorio_CP03_DevSecOps_RM565098_RM565963.pdf): texto simples e todos os dez prints das evidências, com legendas.
+- [Relatório PDF](docs/Relatorio_CP03_DevSecOps_RM565098_RM565963.pdf): texto simples e todos os dez prints das evidências, identificados pelo título.
 - [Apresentação](docs/roteiro-apresentacao.md): roteiro de até dez minutos.
 - [Licenças](THIRD_PARTY_NOTICES.md) e [referências](docs/referencias.md).
 
