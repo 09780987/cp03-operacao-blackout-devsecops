@@ -114,4 +114,4 @@ O repositório usa somente a conta GitHub 09780987 como contribuidora. A identif
 - [Apresentação](docs/roteiro-apresentacao.md): roteiro de até dez minutos.
 - [Licenças](THIRD_PARTY_NOTICES.md) e [referências](docs/referencias.md).
 
-O enunciado fornecido tem 13 páginas e cita um Anexo A ausente. A implementação segue os requisitos escritos nas seções 1 a 9.
+
